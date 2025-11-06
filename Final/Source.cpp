@@ -58,9 +58,9 @@ public:
 	}
 	void ShowIngredientInfo() const {
 		cout << "--------------------" << name << "--------------------" << endl;
-		cout << "Name: " << name;
-		cout << "Count: " << count;
-		cout << "Price(for kg): $" << price;
+		cout << "Name: " << name << endl;
+		cout << "Count: " << count << endl;
+		cout << "Price(for kg): $" << price << endl;
 	}
 	float GetTotalPrice() const {
 		return price * count;
@@ -70,20 +70,25 @@ class Depo {
 	vector<Ingredient> ingredients;
 public:
 
-	void AddIngredients(Ingredient ingr) {
+	void AddIngredient(const Ingredient& ingr, int count = 1) {
+		if (count <= 0) {
+			throw exception("Count must be positive!\n");
+		}
+
 		int index = FindIngredient(ingr.GetName());
 		if (index != -1) {
-			ingredients[index].SetCount((ingredients[index].GetCount() + 1));
-			cout << "Ingredient already existed so count increased by one!\n";
+			throw exception ("Ingredient already exists\n");
 		}
 		else {
-			ingredients.push_back(ingr);
-			cout << "New ingredient added!\n";
+			Ingredient newIngr = ingr;
+			newIngr.SetCount(count);
+			ingredients.push_back(newIngr);
+			cout << "New " << count << " ingredient(s) added!\n";
 		}
 		//WTF
 	}
 
-	void IncreaseNumberOfIngredients(string name, int count) {
+	void IncreaseNumberOfIngredients(const string& name, int count) {
 		if (count == 0) {
 			throw exception("Increasing ingredient by zero is not accepted!\n ");
 		}
@@ -101,26 +106,22 @@ public:
 		}
 		//WTF(write to file)
 	}
-	void DecreaseNumberOfIngredients(string name, int count) {
+	void DecreaseNumberOfIngredients(const string& name, int count) {
 		if (count == 0) {
 			throw exception("Decreasing ingredient by zero is not accepted!\n ");
-		}
-
-		if (count > 0) {
-			throw exception("Positive count is not allowed!\n");
 		}
 
 		int index = FindIngredient(name);
 
 		if (index != -1) {
-			int newCount = ingredients[index].GetCount() + count;
+			int newCount = ingredients[index].GetCount() - count;
 
 			if (newCount < 0) {
-				throw exception("Cannot decrease below zero!\n");
+				throw exception("Cannot decrease to below zero!\n");
 			}
 
 			ingredients[index].SetCount(newCount);
-			cout << "Number of " << name << " was decreased by " << -count << "\n";
+			cout << "Number of " << name << " was decreased by " << count << "\n";
 		}
 		else {
 			throw exception("There is no such ingredient in the inventory\n");
@@ -128,7 +129,7 @@ public:
 		//WTF
 
 	}
-	void DeleteIngredient(string name) {
+	void DeleteIngredient(const string& name) {
 		int index = FindIngredient(name);
 		if (index != -1) {
 			ingredients.erase(ingredients.begin() + index);
@@ -139,8 +140,8 @@ public:
 		}
 	}
 
-	int FindIngredient(string name) {
-		for (int i = 0; i < ingredients.size(); i++) {
+	int FindIngredient(const string& name) {
+		for (size_t i = 0; i < ingredients.size(); i++) {
 			if (ingredients[i].GetName() == name) {
 				return i;
 			}
@@ -149,7 +150,7 @@ public:
 	}
 
 	void ShowAll() {
-		for (auto& ingr : ingredients) {
+		for (const auto& ingr : ingredients) {
 			ingr.ShowIngredientInfo();
 		}
 	}
@@ -165,7 +166,7 @@ public:
 
 	void TotalValue() {
 		double totalVal = 0;
-		for (auto& ingr : ingredients) {
+		for (const auto& ingr : ingredients) {
 			totalVal += ingr.GetTotalPrice();
 		}
 		cout << "Total value: $" << totalVal << endl;
