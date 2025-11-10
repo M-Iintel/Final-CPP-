@@ -5,9 +5,7 @@
 #include <vector>
 #include<windows.h>
 #include<conio.h>
-#include <algorithm>
-#include <cctype>  //cctype and algorithm library: for lowering string (Took from the Internet)
-#include <typeinfo> // Took from the internet to check type of variable in order to prevent crashes
+#include <algorithm> //algorithm library: for lowering string (Took from the Internet)
 
 using namespace std;
 void SetColor(int textColor)
@@ -41,9 +39,7 @@ string getHiddenInput(const string& prompt = "Enter password: ") {
 	return password;
 }
 // SetColor,ResetColor, and getHiddenInput were taken from the Internet
-//int GetCorrectIntInput(const char charachter) {
-//	if(int(charachter)) 
-//}
+
 bool isInteger(const string input) {
 	if (input.empty()) {
 		return false;
@@ -121,7 +117,7 @@ public:
 			file_budget << budget << "#" << monthlyPNL;
 		}
 		else {
-			throw exception("File could not be opened\n");
+			throw exception("Budget file could not be opened\n");
 		}
 		file_budget.close();
 	}
@@ -134,6 +130,9 @@ public:
 				string strBudget;
 				string row;
 				getline(file_budget, row);
+				if (row.length() == 0) {
+					throw exception("Empty file\n");
+				}
 				int counter = 0;
 				for (auto& ch_budget : row) {
 					if (ch_budget != ':' && counter == 0 && ch_budget != '#') {
@@ -158,7 +157,7 @@ public:
 			}
 		}
 		else {
-			throw exception("File could not be opened\n");
+			throw exception("Budget file could not be opened\n");
 		}
 		file_budget.close();
 	}
@@ -245,25 +244,89 @@ class Depo {
 
 public:
 	Depo() {
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Tomato", 1.5, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cheese", 2.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Flour", 1.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Beef", 5.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Chicken", 4.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Rice", 1.2, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Fish", 6.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Egg", 0.8, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cream", 1.3, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Bread", 1.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Oil", 4.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Ketchup", 1.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cucumber", 0.9, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Mushroom", 1.9, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Pasta", 1.4, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Butter", 2.0, 50)));
-		ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Lemon", 1.5, 50)));
-	};
+		try {
+			loadDataDepo();
+		}
+		catch (exception ex) {
+			cout << ex.what();
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Tomato", 1.5, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cheese", 2.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Flour", 1.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Beef", 5.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Chicken", 4.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Rice", 1.2, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Fish", 6.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Egg", 0.8, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cream", 1.3, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Bread", 1.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Oil", 4.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Ketchup", 1.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Cucumber", 0.9, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Mushroom", 1.9, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Pasta", 1.4, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Butter", 2.0, 50)));
+			ingredients.push_back(shared_ptr<Ingredient>(new Ingredient("Lemon", 1.5, 50)));
+		}
 
+	};
+	void saveDataDepo() {
+		ofstream file_depo("Depo.txt", ios::out);
+		if (file_depo.is_open()) {
+			for (size_t i = 0; i < ingredients.size(); i++)
+			{
+				if (i == ingredients.size() - 1) {
+					file_depo << ingredients[i]->GetName() << "#" << ingredients[i]->GetPrice() << "#" << ingredients[i]->GetCount();
+					continue;
+				}
+				file_depo << ingredients[i]->GetName() << "#" << ingredients[i]->GetPrice() << "#" << ingredients[i]->GetCount() << "\n";
+
+			}
+		}
+		else {
+			throw exception("Depo File could not be opened\n");
+		}
+		file_depo.close();
+	}
+	void loadDataDepo() {
+		ifstream file_depo("Depo.txt", ios::in);
+		if (file_depo.is_open()) {
+			while (!file_depo.eof()) {
+				string row;
+				getline(file_depo, row);
+				if (row.length() == 0) {
+					throw exception("File is empty\n");
+				}
+				int counter = 0;
+				string name;
+				string str_price;
+				string str_count;
+				for (auto& ch : row) {
+					if (ch != '#' && counter == 0) {
+						name += ch;
+					}
+					else if (ch != '#' && counter == 1) {
+						str_price += ch;
+					}
+					else if (ch != '#' && counter == 2) {
+						str_count += ch;
+					}
+					else {
+						counter++;
+					}
+				}
+				double price_file = stod(str_price);
+				int count_file = stoi(str_count);
+				string name_file = name;
+				shared_ptr<Ingredient> ingredient_file(new Ingredient(name_file, price_file, count_file));
+				ingredients.push_back(ingredient_file);
+			}
+		}
+		else {
+			throw exception("Depo File could not be opened\n");
+		}
+		file_depo.close();
+
+	}
 	void AddIngredient(shared_ptr<Ingredient> ingr, int count = 1) {
 		if (!ingr) {
 			throw exception("Null pointer can not be ingredient!\n");
@@ -298,6 +361,7 @@ public:
 			int newCount = ingredients[index]->GetCount() + count;
 			ingredients[index]->SetCount(newCount);
 			cout << "Number of " << name << " was increased in depo by " << count << " to " << newCount << endl;
+			saveDataDepo();
 		}
 		else {
 			throw exception("There is no such ingredient in stock!\n");
@@ -317,6 +381,7 @@ public:
 			else {
 				ingredients[index]->SetCount(newCount);
 				cout << "Number of " << name << " was decreased from depo by " << count << " to " << newCount << "!\n";
+				saveDataDepo();
 			}
 		}
 		else {
@@ -333,6 +398,7 @@ public:
 			budget.CalculateProfit(-(ingredients[index]->GetPrice() * count));
 			ingredients[index]->SetCount(count);
 			cout << "Number of " << name << " was changed in depo by " << count << " to " << count << endl;
+			saveDataDepo();
 		}
 		else {
 			throw exception("There is no such ingredient in stock!\n");
@@ -344,6 +410,7 @@ public:
 		if (index != -1) {
 			ingredients.erase(ingredients.begin() + index);
 			cout << name << " was removed from the stock!\n";
+			saveDataDepo();
 		}
 		else {
 			throw exception("There is no such ingredient in the stock!\n");
@@ -474,7 +541,7 @@ public:
 	Meal(string name) {
 		this->name = name;
 	}
-	void AddIngredientToMeal(Depo& d, shared_ptr<Ingredient> ingr, int amount = 1) {
+	void AddIngredientToMeal(Depo& d, shared_ptr<Ingredient> ingr, int amount) {
 		//Ingredient* mealIngr = ingr;
 		if (d.FindIngredient(ingr->GetName()) == -1) {
 			throw exception("Sorry, this ingredient is not available in our depo at the moment.\n");
@@ -482,8 +549,8 @@ public:
 		}
 		double price = ingr->GetPrice();
 		shared_ptr<ReceiptItem> rItem(new ReceiptItem(ingr, amount, price));
-		d.DecreaseNumberOfIngredients(ingr->GetName(), amount);
 		ingredients.push_back(rItem);
+		d.DecreaseNumberOfIngredients(ingr->GetName(), amount);
 		cout << amount << " " << ingr->GetName() << " added to meal: " << name << endl;
 		//budget.CalculateProfit(*this);
 
@@ -561,7 +628,7 @@ public:
 	Menu(Depo& d) {
 		try {
 			auto pizza = shared_ptr<Meal>(new Meal("Pizza"));
-			pizza->AddIngredientToMeal(d, shared_ptr<Ingredient>(new Ingredient("Cheese", 1.5)), 2);
+			pizza->AddIngredientToMeal(d, d.GetIngredient("Cheese"), 2);
 			pizza->AddIngredientToMeal(d, shared_ptr<Ingredient>(new Ingredient("Tomato", 1.0)), 1);
 			meals.push_back(pizza);
 		}
@@ -792,7 +859,7 @@ public:
 				string row;
 				getline(file_Admin, row);
 				if (row.length() == 0) {
-					throw string("File is empty...");
+					throw string("File is empty\n");
 				}
 				string str_username;
 				string str_password;
@@ -1326,7 +1393,7 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 			switch (int(choice)) {
 			case 49: {
 
-				Sleep(300);
+				Sleep(150);
 				system("cls");
 				SetColor(32);
 				cout << "================================= Showing Menu =================================\n";
@@ -1337,7 +1404,7 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 
 			case 50: {
 
-				Sleep(300);
+				Sleep(150);
 				system("cls");
 
 				SetColor(32);
@@ -1351,7 +1418,7 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 			AddMealStart:
 				string meal_name = "";
 				string amountOfIngredients = "";
-				Sleep(300);
+				Sleep(150);
 				system("cls");
 				cout << "Enter name of the meal: ";
 				cin >> meal_name;
@@ -1428,7 +1495,7 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 					}
 				}
 				else if (int(yes_no) == 78 || int(yes_no) == 78 + 32 || int(yes_no) == 27) {
-					Sleep(200);
+					Sleep(150);
 					system("cls");
 
 					continue;
