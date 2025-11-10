@@ -355,6 +355,7 @@ public:
 		budget.CalculateProfit(-(ingr->GetPrice() * ingr->GetCount()));
 		ingredients.push_back(ingr);
 		cout << "New " << count << " " << ingr->GetName() << " added to the stock!\n";
+		saveDataDepo();
 	}
 
 	void IncreaseNumberOfIngredients(string name, int count) {
@@ -1512,9 +1513,11 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 				cout << yes_no << endl;
 
 				if (int(yes_no) == 89 || int(yes_no) == 89 + 32) {
+					Sleep(250);
+					system("cls");
 					string name_of_meal;
 					m.PrintMenu();
-					cout << "Enter name of the meal: ";
+					cout << "Enter name of the meal to delete: ";
 					cin >> name_of_meal;
 					try {
 						SetColor(31);
