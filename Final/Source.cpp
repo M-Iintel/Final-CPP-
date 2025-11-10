@@ -1,16 +1,75 @@
 ﻿#include <iostream>
 #include<fstream>
 #include<string>
+#include<sstream> // for checking whether inputted number is int or no (Took from the Internet)
 #include <vector>
-#include<Windows.h>
+#include<windows.h>
+#include<conio.h>
 #include <algorithm>
-#include <cctype> 
-//cctype and algorithm library: for lowering string (Took from the Internet)
+#include <cctype>  //cctype and algorithm library: for lowering string (Took from the Internet)
+#include <typeinfo> // Took from the internet to check type of variable in order to prevent crashes
+
 using namespace std;
+void SetColor(int textColor)
+{
+	cout << "\033[" << textColor << "m";
+}
+
+void ResetColor() { cout << "\033[0m"; }
+string getHiddenInput(const string& prompt = "Enter password: ") {
+	cout << prompt;
+	string password;
+	char ch;
+
+	while (true) {
+		ch = _getch();
+		if (ch == 13) {
+			cout << endl;
+			break;
+		}
+		else if (ch == 8) {
+			if (!password.empty()) {
+				cout << "\b \b";
+				password.pop_back();
+			}
+		}
+		else if (isprint(ch)) {
+			password += ch;
+			cout << '*';
+		}
+	}
+	return password;
+}
+// SetColor,ResetColor, and getHiddenInput were taken from the Internet
+//int GetCorrectIntInput(const char charachter) {
+//	if(int(charachter)) 
+//}
+bool isInteger(const string input) {
+	if (input.empty()) {
+		return false;
+	}
+
+	stringstream ss(input);
+	int number;
+	ss >> number;
+
+	if (!ss.eof()) {
+		return false;
+	}
+
+	return true;
+}
+void loadingAnimation() {
+	for (size_t i = 0; i < 3; i++)
+	{
+		cout << ".";
+		Sleep(750);
+	}
+}
 class BudgetOfRestaurant {
 	double budget = 20000;
-	double profitLoss = 0;
-	double monthlyPNL = 0; // fetch from file
+	double default_budget = 20000;
+	double monthlyPNL = 0; // will be gotten from file
 	double dailyPNL = 0; // make it reset in every run(every run == new day so dailyPNL=0)
 public:
 	BudgetOfRestaurant() {
@@ -25,9 +84,13 @@ public:
 	void CalculateProfit(double amountMoney) {
 		dailyPNL += amountMoney;
 		monthlyPNL += amountMoney;
-		//cout << dailyPNL << endl;
-		//cout << "MonthlyPNL: " << monthlyPNL << endl;
 		budget += amountMoney;
+		if (budget <= 0) {
+			SetColor(31);
+			cout << "Budget is not enough. Please, restart application!\n";
+			ResetColor();
+			terminate();
+		}
 		saveData();
 	}
 	void ResetDailyPNL() {
@@ -36,7 +99,19 @@ public:
 	void ResetMontlyPNL() {
 		monthlyPNL = 0;
 	}
-	double ProfitOrLoss() {
+	double ProfitOrLoss() noexcept {
+		return budget - default_budget;
+	}
+	double GetDailyPNL()const noexcept {
+		return dailyPNL;
+	}
+	double GetMonthlyPNL()const noexcept {
+		return monthlyPNL;
+	}
+	double GetDefaultBudget()const noexcept {
+		return default_budget;
+	}
+	double GetRemainedBudget() const noexcept {
 		return budget;
 	}
 	void saveData() {
@@ -101,10 +176,16 @@ public:
 #pragma region Setter&Getters
 	void SetName(string name) {
 		if (name.length() > 2) {
+			for (size_t i = 0; i < name.length(); i++)
+			{
+				if (int(name[i]) >= 48 && int(name[i]) <= 57) {
+					throw exception("Invalid ingredient's name input: Integers are not allowed\n");
+				}
+			}
 			this->name = name;
 		}
 		else {
-			throw exception("Invalid ingredient's name input\n");
+			throw exception("Invalid ingredient's name length input\n");
 		}
 	}
 
@@ -140,6 +221,9 @@ public:
 
 #pragma endregion
 	Ingredient(string name, double price, int count = 0) {
+		if (!name.empty()) {
+			name[0] = toupper(name[0]);
+		}
 		SetName(name);
 		SetCount(count);
 		SetPrice(price);
@@ -182,10 +266,13 @@ public:
 
 	void AddIngredient(shared_ptr<Ingredient> ingr, int count = 1) {
 		if (!ingr) {
-			throw exception("Null pointer passed as ingredient!\n");
+			throw exception("Null pointer can not be ingredient!\n");
 		}
 		if (count <= 0) {
 			throw exception("Count must be positive!\n");
+		}
+		if (!ingr->GetName().empty()) {
+			ingr->GetName()[0] = toupper(ingr->GetName()[0]);
 		}
 
 		int index = FindIngredient(ingr->GetName());
@@ -195,29 +282,30 @@ public:
 		}
 
 		ingr->SetCount(count);
+		budget.CalculateProfit(-(ingr->GetPrice() * ingr->GetCount()));
 		ingredients.push_back(ingr);
 		cout << "New " << count << " " << ingr->GetName() << " added to the stock!\n";
-		budget.CalculateProfit(-(ingr->GetPrice() * ingr->GetCount()));
 	}
 
-	void IncreaseNumberOfIngredients(const string& name, int count) {
+	void IncreaseNumberOfIngredients(string name, int count) {
 		if (count <= 0) {
 			throw exception("Increse by postive numbers only!\n");
 		}
 		int index = FindIngredient(name);
-		int newCount = ingredients[index]->GetCount() + count;
+
 		if (index != -1) {
+			budget.CalculateProfit(-(ingredients[index]->GetPrice() * count));
+			int newCount = ingredients[index]->GetCount() + count;
 			ingredients[index]->SetCount(newCount);
 			cout << "Number of " << name << " was increased in depo by " << count << " to " << newCount << endl;
 		}
 		else {
 			throw exception("There is no such ingredient in stock!\n");
 		}
-		budget.CalculateProfit(-(ingredients[index]->GetPrice() * newCount));
 	}
 	void DecreaseNumberOfIngredients(const string& name, int count) {
 		if (count <= 0) {
-			throw exception("Decrease Error: Number must be positive!\n");
+			throw exception("Decrease ERROR: Number must be positive!\n");
 		}
 		int index = FindIngredient(name);
 		if (index != -1) {
@@ -242,13 +330,13 @@ public:
 		}
 		int index = FindIngredient(name);
 		if (index != -1) {
+			budget.CalculateProfit(-(ingredients[index]->GetPrice() * count));
 			ingredients[index]->SetCount(count);
 			cout << "Number of " << name << " was changed in depo by " << count << " to " << count << endl;
 		}
 		else {
 			throw exception("There is no such ingredient in stock!\n");
 		}
-		budget.CalculateProfit(-(ingredients[index]->GetPrice() * count));
 	}
 
 	void DeleteIngredient(const string& name) {
@@ -262,7 +350,7 @@ public:
 		}
 	}
 
-	int FindIngredient(const string& name) const {
+	int FindIngredient(const string name) const {
 		for (int i = 0; i < ingredients.size(); i++) {
 			string nameOfIngredient = ingredients[i]->GetName();
 			string copyOfTakenName = name;
@@ -394,8 +482,8 @@ public:
 		}
 		double price = ingr->GetPrice();
 		shared_ptr<ReceiptItem> rItem(new ReceiptItem(ingr, amount, price));
-		ingredients.push_back(rItem);
 		d.DecreaseNumberOfIngredients(ingr->GetName(), amount);
+		ingredients.push_back(rItem);
 		cout << amount << " " << ingr->GetName() << " added to meal: " << name << endl;
 		//budget.CalculateProfit(*this);
 
@@ -478,7 +566,7 @@ public:
 			meals.push_back(pizza);
 		}
 		catch (exception& ex) {
-			cout << "Error Pizza: " << ex.what() << endl;
+			cout << "ERROR Pizza: " << ex.what() << endl;
 		}
 
 		try {
@@ -489,7 +577,7 @@ public:
 			meals.push_back(pasta);
 		}
 		catch (exception& ex) {
-			cout << "Error Pasta: " << ex.what() << endl;
+			cout << "ERROR Pasta: " << ex.what() << endl;
 		}
 
 		try {
@@ -499,7 +587,7 @@ public:
 			meals.push_back(burger);
 		}
 		catch (exception& ex) {
-			cout << "Error Burger: " << ex.what() << endl;
+			cout << "ERROR Burger: " << ex.what() << endl;
 		}
 
 		try {
@@ -509,7 +597,7 @@ public:
 			meals.push_back(riceMeal);
 		}
 		catch (exception& ex) {
-			cout << "Error RiceMeal: " << ex.what() << endl;
+			cout << "ERROR RiceMeal: " << ex.what() << endl;
 		}
 
 		try {
@@ -519,7 +607,7 @@ public:
 			meals.push_back(chicken);
 		}
 		catch (exception& ex) {
-			cout << "Error ChickenSteak: " << ex.what() << endl;
+			cout << "ERROR ChickenSteak: " << ex.what() << endl;
 		}
 
 		try {
@@ -529,7 +617,7 @@ public:
 			meals.push_back(beef);
 		}
 		catch (exception& ex) {
-			cout << "Error BeefSteak: " << ex.what() << endl;
+			cout << "ERROR BeefSteak: " << ex.what() << endl;
 		}
 
 		try {
@@ -540,7 +628,7 @@ public:
 			meals.push_back(salad);
 		}
 		catch (exception& ex) {
-			cout << "Error Salad: " << ex.what() << endl;
+			cout << "ERROR Salad: " << ex.what() << endl;
 		}
 
 		try {
@@ -550,7 +638,7 @@ public:
 			meals.push_back(omelette);
 		}
 		catch (exception& ex) {
-			cout << "Error Omelette: " << ex.what() << endl;
+			cout << "ERROR Omelette: " << ex.what() << endl;
 		}
 
 		try {
@@ -560,7 +648,7 @@ public:
 			meals.push_back(sushi);
 		}
 		catch (exception& ex) {
-			cout << "Error Sushi: " << ex.what() << endl;
+			cout << "ERROR Sushi: " << ex.what() << endl;
 		}
 
 		try {
@@ -569,11 +657,14 @@ public:
 			meals.push_back(grilledFish);
 		}
 		catch (exception& ex) {
-			cout << "Error GrilledFish: " << ex.what() << endl;
+			cout << "ERROR GrilledFish: " << ex.what() << endl;
 		}
 
 	}
 	int FindMeal(string name) {
+		if (!name.empty()) {
+			name[0] = toupper(name[0]);
+		}
 		for (int i = 0; i < meals.size(); i++)
 		{
 			if (meals[i]->GetName() == name) {
@@ -583,6 +674,11 @@ public:
 		return -1;
 	}
 	void AddMeal(Depo& d, const string name, int count = 1) {
+		for (auto& ch : name) {
+			if (int(ch) >= 48 && int(ch) <= 57) {
+				throw exception("Meal name ERROR: Meal name can not contain integer\n");
+			}
+		}
 		auto new_meal = shared_ptr<Meal>(new Meal(name));
 		for (size_t i = 0; i < count; i++)
 		{
@@ -653,6 +749,21 @@ public:
 			cout << ++counter << ". " << MenuItem->GetName() << " $" << MenuItem->TotalPriceOfIngredients() << endl;
 		}
 	}
+	void DeleteMeal(const string name) {
+		int index = FindMeal(name);
+
+		if (index != -1) {
+			string real_name = meals[index]->GetName();
+			meals.erase(meals.begin() + index);
+			cout << real_name;
+			SetColor(32);
+			cout << " was successfully deleted\n";
+			ResetColor();
+		}
+		else {
+			throw exception("There is no such meal\n");
+		}
+	}
 
 };
 
@@ -717,33 +828,717 @@ public:
 		}
 		transform(username.begin(), username.end(), username.begin(), ::tolower);
 		if (username == this->username && password == this->password) {
+			SetColor(32);
 			cout << "Logged in" << endl;
+			ResetColor();
 		}
 		else {
-			cout << "Failed\n";
+			throw exception("Failed to log in, incorrect password or username\n");
 		}
 	}
 
 };
+void ShowModifyIngredientsMenu(Depo& d) {
+
+	while (true) {
+	ModifyIngredientsStart:
+		cout << "========== MODIFYING INGREDIENTS ==========" << endl;
+		cout << "1. Add New Ingredient To Depo" << endl;
+		cout << "2. Increase Number Of Existing Ingredient" << endl;
+		SetColor(31);
+		cout << "3. Decrease Number Of Existing Ingredient" << endl;
+		cout << "4. Delete Ingredient From Depo" << endl;
+		ResetColor();
+		cout << "5. Back To Admin Panel" << endl;
+		cout << "===========================================" << endl;
+		cout << "Enter your choice: ";
+
+		char choice = _getch();
+		_putch(choice);
+
+		if (int(choice) >= 49 && int(choice) <= 57) {
+			switch (int(choice)) {
+			case 49: {
+				system("cls");
+				string name, count_str, price_str;
+
+				cout << "Enter ingredient name: ";
+				cin >> name;
+				cout << "Enter count: ";
+				cin >> count_str;
+				cout << "Enter price per unit: ";
+				cin >> price_str;
+				if (isInteger(count_str) && stod(price_str) > 0) {
+					try {
+						auto ingr = shared_ptr<Ingredient>(new Ingredient(name, stod(price_str)));
+						SetColor(32);
+						cout << "Adding ingredient";
+						loadingAnimation();
+						cout << endl;
+						d.AddIngredient(ingr, stoi(count_str));
+						ResetColor();
+					}
+					catch (exception& ex) {
+						SetColor(31);
+						cout << ex.what() << endl;
+						ResetColor();
+					}
+				}
+				else {
+					SetColor(31);
+					cout << "Invalid input ERROR: ";
+					ResetColor();
+					cout << "Count and price must be a positive number.\n";
+				}
+				break;
+			}
+
+			case 50: {
+				system("cls");
+				string name, count_str;
+				cout << "Enter ingredient name to increase: ";
+				cin >> name;
+				cout << "Enter number to add to the existent ingredient: ";
+				cin >> count_str;
+
+				if (isInteger(count_str)) {
+					try {
+						SetColor(32);
+						cout << "Increasing count";
+						loadingAnimation();
+						cout << endl;
+						d.IncreaseNumberOfIngredients(name, stoi(count_str));
+						ResetColor();
+					}
+					catch (exception& ex) {
+						SetColor(31);
+						cout << ex.what() << endl;
+						ResetColor();
+					}
+				}
+				else {
+					SetColor(31);
+					cout << "Invalid input! Enter positive integer only.\n";
+					ResetColor();
+				}
+				break;
+			}
+
+			case 51: {
+				system("cls");
+				string name, count_str;
+				cout << "Enter ingredient name to decrease: ";
+				cin >> name;
+				cout << "Enter number to exclude from the existent ingredient: ";
+				cin >> count_str;
+
+				if (isInteger(count_str) > 0) {
+					try {
+						SetColor(32);
+						cout << "Decreasing count";
+						loadingAnimation();
+						cout << endl;
+						d.DecreaseNumberOfIngredients(name, stoi(count_str));
+						ResetColor();
+					}
+					catch (exception& ex) {
+						SetColor(31);
+						cout << ex.what() << endl;
+						ResetColor();
+					}
+				}
+				else {
+					SetColor(31);
+					cout << "Invalid input! Enter positive integer only.\n";
+					ResetColor();
+				}
+				break;
+			}
+
+			case 52: {
+			DeleteStart:
+				system("cls");
+				cout << "Are you sure you want to delete an ingredient?(";
+				SetColor(32);
+				cout << "Y";
+				ResetColor();
+				cout << "/";
+				SetColor(31);
+				cout << "N";
+				ResetColor();
+				cout << "): ";
+
+				char yes_no = _getch();
+				_putch(yes_no);
+				cout << endl;
+				if (int(yes_no) == 89 || int(yes_no) == 121) {
+					string name;
+					cout << "\nEnter ingredient name: ";
+					cin >> name;
+					try {
+						d.DeleteIngredient(name);
+						SetColor(31);
+						cout << "\nIngredient removed successfully.\n";
+						ResetColor();
+					}
+					catch (exception& ex) {
+						SetColor(31);
+						cout << ex.what() << endl;
+						ResetColor();
+					}
+				}
+				else if (int(yes_no) == 78 || int(yes_no) == 110 || int(yes_no) == 27) {
+					continue;
+				}
+				else {
+					goto DeleteStart;
+				}
+				break;
+			}
 
 
+			case 53: {
+				cout << "\nReturning to Admin Panel";
+				loadingAnimation();
+				Sleep(150);
+				system("cls");
+				return;
+			}
+
+			default:
+				SetColor(31);
+				cout << "\nInvalid choice.\n";
+				Sleep(800);
+				system("cls");
+				ResetColor();
+				break;
+			}
+		}
+		else if (int(choice) == 27) {
+			return;
+		}
+		else {
+			system("cls");
+			goto ModifyIngredientsStart;
+		}
+	}
+}
+void ShowSalesReport(BudgetOfRestaurant& b) {
+	system("cls");
+	SetColor(32);
+	cout << "Fetching Data";
+	loadingAnimation();
+	cout << endl;
+	Sleep(300);
+SaleReportStart:
+	while (true) {
+
+		SetColor(33);
+		cout << "======================= BUDGET MANAGEMENT PANEL =======================" << endl;
+		ResetColor();
+
+		cout << "1. Show Default (Base) Budget" << endl;
+		cout << "2. Show Remaining Budget" << endl;
+		cout << "3. Show Daily Profit / Loss" << endl;
+		cout << "4. Show Monthly Profit / Loss" << endl;
+		cout << "5. Show Profit / Loss Percentage" << endl;
+		cout << "6. Show All Data Combined" << endl;
+		cout << "7. Back to Admin Panel" << endl;
+
+		SetColor(33);
+		cout << "=======================================================================" << endl;
+		ResetColor();
+		cout << "Enter your choice: ";
+		char choice = _getch();
+		_putch(choice);
+		Sleep(250);
+		cout << endl;
+
+		if (int(choice) >= 48 && int(choice) <= 57) {
+			double defaultBudget, remainedBudget, dailyPnL, monthlyPnL, totalPnL;
+			defaultBudget = b.GetDefaultBudget();
+			remainedBudget = b.GetRemainedBudget();
+			switch (int(choice)) {
+			case 49: {
+				system("cls");
+
+				cout << "Base Budget: $";
+				SetColor(32);
+				cout << defaultBudget;
+				cout << endl;
+				Sleep(1500);
+				ResetColor();
+				break;
+			}
+			case 50: {
+				system("cls");
+				cout << "Remainig Budget : $";
+				if (remainedBudget >= 0) {
+					SetColor(32);
+					cout << remainedBudget;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (remainedBudget < 0) {
+					SetColor(31);
+					cout << remainedBudget;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				break;
+			}
+			case 51: {
+				system("cls");
+				dailyPnL = b.GetDailyPNL();
+				cout << "Today's Profit / Loss: $";
+				if (dailyPnL > 0) {
+					SetColor(32);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (dailyPnL < 0) {
+					SetColor(31);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					SetColor(94);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				break;
+			}
+			case 52: {
+				system("cls");
+				monthlyPnL = b.GetMonthlyPNL();
+				cout << "Today's Profit / Loss: $";
+				if (monthlyPnL > 0) {
+					SetColor(32);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (monthlyPnL < 0) {
+					SetColor(31);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					SetColor(94);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				break;
+			}
+			case 53: {
+				system("cls");
+				double change = ((remainedBudget - defaultBudget) / defaultBudget) * 100.0;
+				if (change < 0) {
+					cout << "You are not doing well, since your financial performance is negative. ";
+					cout << "\nTotal Loss: ";
+					SetColor(31);
+					cout << change << "%";
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (change > 0) {
+					cout << "You are doing great, your financial performance is positive. ";
+					cout << "\nTotal Gain: ";
+					SetColor(32);
+					cout << change << "% profit";
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					cout << "Your financial performance is stable. No profit or loss recorded.\n";
+				}
+				break;
+			}
+			case 54: {
+				system("cls");
+
+				double defaultBudget = b.GetDefaultBudget();
+				double remainedBudget = b.GetRemainedBudget();
+				double dailyPnL = b.GetDailyPNL();
+				double monthlyPnL = b.GetMonthlyPNL();
+				double change = ((remainedBudget - defaultBudget) / defaultBudget) * 100.0;
+
+				cout << "================== FULL FINANCIAL OVERVIEW ==================" << endl;
+
+				cout << "Base Budget: $";
+				SetColor(32);
+				cout << defaultBudget;
+				cout << endl;
+				Sleep(1500);
+				ResetColor();
+
+				cout << "Remaining Budget: $";
+				if (remainedBudget >= 0) {
+					SetColor(32);
+					cout << remainedBudget;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					SetColor(31);
+					cout << remainedBudget;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+
+				cout << "Today's Profit / Loss: $";
+				if (dailyPnL > 0) {
+					SetColor(32);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (dailyPnL < 0) {
+					SetColor(31);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					SetColor(94);
+					cout << dailyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+
+				cout << "Monthly Profit / Loss: $";
+				if (monthlyPnL > 0) {
+					SetColor(32);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else if (monthlyPnL < 0) {
+					SetColor(31);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+				else {
+					SetColor(94);
+					cout << monthlyPnL;
+					cout << endl;
+					Sleep(1500);
+					ResetColor();
+				}
+
+				if (change < 0) {
+					cout << "You are not doing well, since your financial performance is negative. ";
+					cout << "\nTotal Loss: ";
+					SetColor(31);
+					cout << change << "%";
+					cout << endl;
+					Sleep(500);
+					ResetColor();
+				}
+				else if (change > 0) {
+					cout << "You are doing great, your financial performance is positive. ";
+					cout << "\nTotal Gain: ";
+					SetColor(32);
+					cout << change << "% profit";
+					cout << endl;
+					Sleep(500);
+					ResetColor();
+				}
+				else {
+					cout << "Your financial performance is stable. No profit or loss recorded.\n";
+				}
+
+				cout << "=============================================================" << endl;
+				Sleep(1500);
+				break;
+			}
+
+			case 55: {
+				cout << "Returning to Admin Panel";
+				loadingAnimation();
+				Sleep(155);
+				system("cls");
+				return;
+			}
+			default:
+				SetColor(31);
+				cout << "\nInvalid choice.\n";
+				Sleep(800);
+				system("cls");
+				ResetColor();
+				break;
+			}
+		}
+		else if (int(choice) == 27) {
+			return;
+		}
+		else {
+
+			system("cls");
+			goto SaleReportStart;
+		}
+
+	}
+}
+void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
+
+	while (true) {
+	AdminPanelStart:
+		cout << "\n========== ADMIN PANEL ==========" << endl;
+		cout << "1. Show Menu" << endl;
+		cout << "2. Show All Ingredients In The Depo" << endl;
+		cout << "3. Add New Meal To The menu" << endl;
+		SetColor(31);
+		cout << "4. Remove Meal From Menu" << endl;
+		ResetColor();
+		cout << "5. Modify Ingredients" << endl;
+		cout << "6. Show Sales Report" << endl;
+		cout << "7. Back to Main Menu" << endl;
+		cout << "=================================" << endl;
+		cout << "Enter your choice: ";
+
+		char choice = _getch();
+		_putch(choice);
+		if (int(choice) >= 48 && int(choice) <= 57) {
+			switch (int(choice)) {
+			case 49: {
+
+				Sleep(300);
+				system("cls");
+				SetColor(32);
+				cout << "================================= Showing Menu =================================\n";
+				ResetColor();
+				m.PrintMenu();
+				break;
+			}
+
+			case 50: {
+
+				Sleep(300);
+				system("cls");
+
+				SetColor(32);
+				cout << "================================= Showing Ingredients... =================================\n";
+				ResetColor();
+				d.ShowAll();
+				break;
+			}
+
+			case 51: {
+			AddMealStart:
+				string meal_name = "";
+				string amountOfIngredients = "";
+				Sleep(300);
+				system("cls");
+				cout << "Enter name of the meal: ";
+				cin >> meal_name;
+				cout << "Enter number of INGREDIENTS that will be in " << meal_name << ": ";
+				cin >> amountOfIngredients;
+				if (isInteger(amountOfIngredients) && stoi(amountOfIngredients) > 0) {
+					try {
+						SetColor(32);
+						cout << "\n--- Adding New Meal ---";
+						for (size_t i = 0; i < 3; i++)
+						{
+							cout << ".";
+							Sleep(750);
+						}
+						ResetColor();
+						cout << endl;
+						m.AddMeal(d, meal_name, stoi(amountOfIngredients));
+					}
+					catch (exception ex) {
+						SetColor(31);
+						cout << ex.what();
+						Sleep(500);
+						ResetColor();
+						goto AddMealStart;
+
+					}
+					break;
+				}
+				else {
+					SetColor(31);
+					cout << "Ingredient Number ERROR: ";
+					cout << "Input positive integers only\n";
+					ResetColor();
+					goto AddMealStart;
+				}
+			}
+
+			case 52: {
+			removeStart:
+				cout << "\nAre you sure to remove a meal?(";
+				SetColor(32);
+				cout << "Y";
+				ResetColor();
+				cout << "/";
+				SetColor(31);
+				cout << "N";
+				ResetColor();
+				cout << "):  ";
+				char yes_no = _getch();
+				cout << yes_no << endl;
+
+				if (int(yes_no) == 89 || int(yes_no) == 89 + 32) {
+					string name_of_meal;
+					m.PrintMenu();
+					cout << "Enter name of the meal: ";
+					cin >> name_of_meal;
+					try {
+						SetColor(31);
+						cout << "\n--- Removing Meal ---";
+						for (size_t i = 0; i < 3; i++)
+						{
+							cout << ".";
+							Sleep(750);
+						}
+						ResetColor();
+						cout << endl;
+						m.DeleteMeal(name_of_meal);
+					}
+					catch (exception ex) {
+						SetColor(31);
+						cout << "Meal Name ERROR: ";
+						cout << ex.what();
+						ResetColor();
+					}
+				}
+				else if (int(yes_no) == 78 || int(yes_no) == 78 + 32 || int(yes_no) == 27) {
+					Sleep(200);
+					system("cls");
+
+					continue;
+				}
+				else {
+					Sleep(200);
+					system("cls");
+					goto removeStart;
+				}
+				break;
+			}
+
+			case 53: {
+
+				system("cls");
+				ShowModifyIngredientsMenu(d);
+				//system("cls");
+				break;
+			}
+
+			case 54: {
+				ShowSalesReport(b);
+				system("cls");
+				break;
+			}
+
+			case 55: {
+
+			ToMainMenuStart:
+				system("cls");
+				cout << "\nAre you sure to return to Main Menu?(you will have to login again)(";
+				SetColor(32);
+				cout << "Y";
+				ResetColor();
+				cout << "/";
+				SetColor(31);
+				cout << "N";
+				ResetColor();
+				cout << "):  ";
+				char main_menu_no = _getch();
+				cout << main_menu_no << endl;
+				if (int(main_menu_no) == 89 || int(main_menu_no) == 89 + 32) {
+					return;
+				}
+				else if (int(main_menu_no) == 78 || int(main_menu_no) == 78 + 32 || int(main_menu_no) == 27) {
+					Sleep(400);
+					system("cls");
+					continue;
+				}
+				else {
+					goto ToMainMenuStart;
+				}
+			}
+			default:
+				cout << "Invalid choice. Try again.\n";
+				break;
+			}
+		}
+		else if (int(choice) == 27) {
+			return;
+		}
+		else {
+			continue;
+		}
+	}
+}
 int main() {
-	Depo d;
-	Admin admin("admin", "!admin123", budget, d);
-	Menu m(d);
-	m.PrintMenu();
-	try {
+	Depo depo;
+	Menu menu(depo);
+	while (true) {
+	Start:
+		system("cls");
+		cout << "====================================\n";
+		cout << " Welcome to the Restaurant: Byte & Bite \n";
+		cout << "====================================\n";
+		cout << "1. Admin Login\n";
+		cout << "2. User Menu\n";
+		cout << "3. Exit\n";
+		cout << "Enter your choice: ";
+		string strchoice;
+		int intchoice;
+		cin >> strchoice;
+		if (isInteger(strchoice)) {
+			intchoice = stoi(strchoice);
+		}
+		else {
+			continue;
+		}
+		switch (intchoice) {
+		case 1: {
+			system("cls");
+			cout << "--- Admin Login ---\n";
+			string username, password;
+			cout << "Enter username: ";
+			cin >> username;
+			password = getHiddenInput();
+			try {
+				Admin(username, password, budget, depo);
+				ShowAdminPanel(depo, budget, menu);
 
-		//m.AddMeal(d, "Kabab", 1);
+			}
+			catch (exception ex) {
+				SetColor(31);
+				cout << "Login ERROR: ";
+				cout << ex.what();
+				ResetColor();
+				Sleep(1500);
+			}
+		}
+		}
 	}
-	catch (exception ex) {
-		cout << ex.what() << endl;
-	}
-	m.PrintMenu();
-	d.ShowAll();
-	//m.DeleteIngredientOfMeal(d, "Pasta");
-	m.ChangeNumOfIngredients(d, "RiceMeal");
-	d.ShowAll();
-
 	return 0;
 }
