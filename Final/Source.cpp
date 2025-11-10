@@ -6,8 +6,16 @@
 #include<windows.h>
 #include<conio.h>
 #include <algorithm> //algorithm library: for lowering string (Took from the Internet)
+#include <regex>
+#include <map>
 
 using namespace std;
+using std::cout;
+using std::cin;
+bool containsSymbolRegex(const string& str) {
+	regex pattern("[^a-zA-Z0-9]");
+	return regex_search(str, pattern);
+}
 void SetColor(int textColor)
 {
 	cout << "\033[" << textColor << "m";
@@ -538,6 +546,9 @@ public:
 		return this->price;
 	}
 #pragma endregion
+	Meal() {
+		name = " ";
+	}
 	Meal(string name) {
 		this->name = name;
 	}
@@ -619,6 +630,27 @@ public:
 			else {
 				cout << "Use delete function instead" << endl;
 			}
+		}
+	}
+	void ChangeNumberOfIngredientUser(string name, int count, Depo& d) {
+		int index = FindIngredient(name);
+		if (index != -1) {
+			if (count > 0) {
+				ingredients[index]->SetAmount(count);
+				d.DecreaseNumberOfIngredients(name, count);
+			}
+			else {
+				cout << "Use delete function instead" << endl;
+			}
+		}
+	}
+	void RegulateNumberOfIngredientsAfterOrder(Meal name, Depo& d) {
+
+		for (size_t i = 0; i < ingredients.size(); i++)
+		{
+			auto removeNme = name.ingredients[i]->GetName();
+			auto removeCount = name.ingredients[i]->GetAmount();
+			d.DecreaseNumberOfIngredients(removeNme, removeCount);
 		}
 	}
 };
@@ -739,6 +771,18 @@ public:
 			}
 		}
 		return -1;
+	}
+	Meal ReturnMeal(string name) {
+		if (!name.empty()) {
+			name[0] = toupper(name[0]);
+		}
+		for (int i = 0; i < meals.size(); i++)
+		{
+			if (meals[i]->GetName() == name) {
+				return *meals[i];
+			}
+		}
+		return Meal();
 	}
 	void AddMeal(Depo& d, const string name, int count = 1) {
 		for (auto& ch : name) {
@@ -1562,9 +1606,486 @@ void ShowAdminPanel(Depo& d, BudgetOfRestaurant& b, Menu& m) {
 		}
 	}
 }
+
+
+// ==================================================================
+// ==============================USER================================
+
+class User {
+	string username;
+	string password;
+public:
+	void SetUsername(string username) {
+		if (username.length() > 3) {
+			this->username = username;
+		}
+	}
+	void SetPassword(string password) {
+		if (containsSymbolRegex(password)) {
+			this->password = password;
+		}
+		else {
+			SetColor(31);
+			throw exception("Password must contain at least one symbol\n");
+			ResetColor();
+		}
+	}
+	string GetUsername() const noexcept {
+		return username;
+	}
+	string GetPassword() const noexcept {
+		return password;
+	}
+
+	User(string username, string password) {
+		SetUsername(username);
+		SetPassword(password);
+
+	}
+};
+class RestaurantUsers {
+	vector<User>users;
+public:
+	RestaurantUsers() {
+		try
+		{
+
+			loadData();
+		}
+		catch (string ex)
+		{
+			cout << ex << endl;
+			User user("user", "user@123");
+			users.push_back(user);
+			saveData();
+		}
+	}
+	void saveData() { //butun hospitalda olan vectorlari ayri-ayri fayllara yazacaq
+		ofstream fs("users.txt", ios::out);
+		if (fs.is_open()) {
+			for (size_t i = 0; i < users.size(); i++)
+			{
+				if (i == users.size() - 1) //sonuncu doctor
+				{
+					fs << users[i].GetUsername() << "#" << users[i].GetPassword();
+					continue;
+				}
+				fs << users[i].GetUsername() << "#" << users[i].GetPassword() << '\n';
+
+			}
+		}
+		else {
+			throw string("User file was not opened\n");
+		}
+		fs.close();
+	}
+	void loadData() {
+
+		ifstream fs("users.txt", ios::in);
+
+		if (fs.is_open()) {
+			while (!fs.eof()) {
+				string row;
+				getline(fs, row);
+				if (row.length() == 0) {
+					throw string("File is empty\n");
+				}
+				int counter = 0;
+				string username, password;
+
+				for (auto ch : row)
+				{
+					if (ch != '#' && counter == 0) {
+						username += ch;
+					}
+					else if (ch != '#' && counter == 1) {
+						password += ch;
+					}
+
+					else {
+						counter++;
+					}
+				}
+				User user(username, password);
+				users.push_back(user);
+			}
+		}
+		else {
+			throw string("User file not found\n");
+		}
+		fs.close();
+
+	}
+	//void AddUser(const User& user) {
+	//	users.push_back(user);
+	//	saveData();
+	//}
+	void Register(string username, string password) {
+		for (auto& u : users) {
+			if (u.GetUsername() == username) {
+				cout << username;
+				SetColor(31);
+				throw exception(" Username already exists!\n");
+			}
+		}
+		try {
+			User newUser(username, password);
+			users.push_back(newUser);
+			saveData();
+			SetColor(32);
+			cout << "Registration successful!\n";
+			ResetColor();
+
+		}
+		catch (exception& ex) {
+			cout << ex.what();
+		}
+	}
+	void Login(string username, string password) {
+		for (auto& u : users) {
+			if (u.GetUsername() == username && u.GetPassword() == password) {
+				SetColor(32);
+				cout << "Login successful, welcome " << username << "!\n";
+				ResetColor();
+				return;
+			}
+		}
+		SetColor(31);
+		throw exception("Incorrect username or password!\n");
+		ResetColor();
+	}
+};
+class Cart {
+	vector <Meal>added_meals;
+	map<string, double> history_map;
+
+public:
+	void saveDataCart() {
+		ofstream file_history("OrderHistory.txt", ios::out);
+		if (file_history.is_open()) {
+			//for (size_t i = 0; i < added_meals.size(); i++)
+			//{
+			//	if (i < added_meals.size() - 1) {
+			//		file_history << added_meals[i].GetName() << "#" << added_meals[i].GetPrice();
+			//		continue;
+			//	}
+			//	file_history << added_meals[i].GetName() << "#" << added_meals[i].GetPrice() << "\n";
+
+			//}
+
+			for (auto map = history_map.begin(); map != history_map.end(); ++map) {
+
+				file_history << map->first << "#" << map->second << "\n";
+
+			}
+
+		}
+		else {
+			throw exception("History file could not be opened\n");
+		}
+		file_history.close();
+	}
+	void LoadDataCart() {
+		ifstream file_history("OrderHistory.txt", ios::in);
+		if (file_history.is_open()) {
+			while (!file_history.eof()) {
+				string row;
+				getline(file_history, row);
+				if (row.length() == 0) {
+					throw exception("History file is empty\n");
+				}
+				int counter = 0;
+				string name, str_price;
+				for (auto& ch : row) {
+					if (ch != '#' && counter == 0) {
+						name += ch;
+					}
+					else if (ch != '#' && counter == 1) {
+						str_price += ch;
+					}
+					else {
+						counter++;
+					}
+				}
+				double price = stod(str_price);
+				history_map.insert({ name,price });
+			}
+		}
+		else {
+			throw exception("History file not found\n");
+		}
+		file_history.close();
+	}
+	Cart() {
+		try {
+
+			LoadDataCart();
+		}
+		catch (exception ex) {
+			cout << ex.what();
+			history_map.insert({ "NAME",0.0 });
+			saveDataCart();
+		}
+	}
+
+	int FindIndex(string meal_name) {
+		for (int i = 0; i < added_meals.size(); i++) {
+			if (added_meals[i].GetName() == meal_name) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	void AddMeal(string meal_name, Depo& d, Menu& m) {
+		int index = FindIndex(meal_name);
+		auto myMeal = m.ReturnMeal(meal_name);
+		if (myMeal.GetName() == " ") {
+			throw exception("Sorry, we do not have that meal!");
+		}
+		/*myMeal.RegulateNumberOfIngredientsAfterOrder(myMeal, d);*/
+		added_meals.push_back(myMeal);
+	}
+	void RemoveMeal(string meal_name) {
+		for (size_t i = 0; i < added_meals.size(); i++) {
+			if (added_meals[i].GetName() == meal_name) {
+				added_meals.erase(added_meals.begin() + i);
+				SetColor(32);
+				cout << meal_name << " has been removed from your cart.\n";
+				ResetColor();
+				return;
+			}
+		}
+		SetColor(31);
+		cout << "Meal not found in cart.\n";
+		ResetColor();
+	}
+	void ShowCart() const {
+		if (added_meals.empty()) {
+			SetColor(32);
+			cout << "Your cart is empty.\n";
+			ResetColor();
+			return;
+		}
+		cout << "----- Your Cart -----\n";
+		for (auto meal : added_meals) {
+			cout << meal.GetName() << " - Price: " << meal.TotalPriceOfMeal() << " USD\n";
+		}
+		cout << "---------------------\n";
+	}
+	void ModifyIngredientInMeal(string meal_name, string ingredient_name, int extraAmount, Depo& d) {
+		for (auto& meal : added_meals) {
+			if (meal.GetName() == meal_name) {
+				meal.ChangeNumberOfIngredientUser(ingredient_name, extraAmount, d);
+				cout << "Ingredient " << ingredient_name << " in " << meal_name
+					<< " increased by " << extraAmount << " units.\n";
+				return;
+			}
+		}
+		SetColor(31);
+		cout << "Meal not found in cart.\n";
+		ResetColor();
+	}
+	void ConfirmOrder(Depo& d) {
+		if (added_meals.empty()) {
+			SetColor(31);
+			cout << "You have no meals to order.\n";
+			ResetColor();
+			return;
+		}
+
+		double total = 0;
+		for (auto meal : added_meals) {
+			total += meal.TotalPriceOfMeal();
+			meal.RegulateNumberOfIngredientsAfterOrder(meal, d);
+			meal.TotalPriceOfMeal();
+			history_map.insert({ meal.GetName(),meal.GetPrice() });
+			saveDataCart();
+		}
+
+		SetColor(32);
+		cout << "Order confirmed! Total paid: " << total << " USD.\n";
+		//cout << "Restaurant budget updated.\n";
+		ResetColor();
+
+		added_meals.clear(); // empty the cart
+	}
+	void ShowHistory() {
+		for (auto m : history_map) {
+			cout << m.first << " " << m.second << endl;
+		}
+	}
+};
+void ShowUserPanel(Depo& d, Menu& m, Cart& cart) {
+
+	while (true) {
+	UserPanelStart:
+		cout << "\n========== USER PANEL ==========" << endl;
+		cout << "1. Show Menu" << endl;
+		cout << "2. Add Meal to Cart" << endl;
+		cout << "3. View Cart" << endl;
+		cout << "4. Remove Meal from Cart" << endl;
+		cout << "5. Modify Ingredient in Meal" << endl;
+		cout << "6. Confirm Order" << endl;
+		cout << "7. View Order History" << endl;
+		cout << "8. Back to Main Menu" << endl;
+		cout << "=================================" << endl;
+		cout << "Enter your choice: ";
+
+		char choice = _getch();
+		_putch(choice);
+
+		if (int(choice) >= 48 && int(choice) <= 57) {
+			switch (int(choice)) {
+
+			case 49: {
+				Sleep(150);
+				system("cls");
+				SetColor(32);
+				cout << "================================= Showing Menu =================================\n";
+				ResetColor();
+				m.PrintMenu();
+				break;
+			}
+
+			case 50: {
+				Sleep(150);
+				system("cls");
+				string meal_name;
+				cout << "Enter name of the meal to add: ";
+				cin >> meal_name;
+
+				try {
+					SetColor(32);
+					cout << "\nAdding Meal";
+					for (size_t i = 0; i < 3; i++) {
+						cout << ".";
+						Sleep(750);
+					}
+					ResetColor();
+					cout << endl;
+					cart.AddMeal(meal_name, d, m);
+				}
+				catch (exception& ex) {
+					SetColor(31);
+					cout << ex.what() << endl;
+					ResetColor();
+				}
+				break;
+			}
+
+			case 51: {
+				Sleep(150);
+				system("cls");
+				SetColor(32);
+				cout << "================================= Showing Cart =================================\n";
+				ResetColor();
+				cart.ShowCart();
+				break;
+			}
+
+			case 52: {
+			removeStart:
+				cout << "\nAre you sure to remove a meal from cart?(";
+				SetColor(32);
+				cout << "Y";
+				ResetColor();
+				cout << "/";
+				SetColor(31);
+				cout << "N";
+				ResetColor();
+				cout << "):  ";
+				char yes_no = _getch();
+				cout << yes_no << endl;
+
+				if (int(yes_no) == 89 || int(yes_no) == 89 + 32) {
+					string meal_name;
+					cart.ShowCart();
+					cout << "Enter name of the meal: ";
+					cin >> meal_name;
+					cart.RemoveMeal(meal_name);
+				}
+				else if (int(yes_no) == 78 || int(yes_no) == 78 + 32 || int(yes_no) == 27) {
+					Sleep(150);
+					system("cls");
+					continue;
+				}
+				else {
+					Sleep(200);
+					system("cls");
+					goto removeStart;
+				}
+				break;
+			}
+
+			case 53: {
+				system("cls");
+				string meal_name, ingredient_name;
+				int extraAmount;
+				cout << "Enter meal name: ";
+				cin >> meal_name;
+				cout << "Enter ingredient name: ";
+				cin >> ingredient_name;
+				cout << "Enter extra amount: ";
+				cin >> extraAmount;
+
+				cart.ModifyIngredientInMeal(meal_name, ingredient_name, extraAmount, d);
+				break;
+			}
+
+			case 54: {
+				system("cls");
+				cart.ConfirmOrder(d);
+				break;
+			}
+
+			case 55: {
+				Sleep(150);
+				system("cls");
+				SetColor(32);
+				cout << "================================= Order History =================================\n";
+				ResetColor();
+
+				cart.ShowHistory();
+
+				cout << "=================================================================================\n";
+				break;
+			}
+
+			case 56: { // 8 - Back to Main Menu
+			ToMainMenuStart:
+				system("cls");
+				cout << "\nAre you sure to return to Main Menu?(you will have to login again)(";
+				SetColor(32);
+				cout << "Y";
+				ResetColor();
+				cout << "/";
+				SetColor(31);
+				cout << "N";
+				ResetColor();
+				cout << "):  ";
+				char main_menu_no = _getch();
+				cout << main_menu_no << endl;
+				if (int(main_menu_no) == 89 || int(main_menu_no) == 89 + 32) {
+					return;
+				}
+				else if (int(main_menu_no) == 78 || int(main_menu_no) == 78 + 32 || int(main_menu_no) == 27) {
+					Sleep(400);
+					system("cls");
+					continue;
+				}
+				else {
+					goto ToMainMenuStart;
+				}
+
+			}
+			}
+		}
+	}
+};
 int main() {
 	Depo depo;
 	Menu menu(depo);
+	Cart cart;
 	while (true) {
 	Start:
 		system("cls");
@@ -1603,6 +2124,81 @@ int main() {
 				cout << ex.what();
 				ResetColor();
 				Sleep(1500);
+			}
+			break;
+		}
+		case 2: {
+
+			system("cls");
+			RestaurantUsers resUsers;
+			while (true) {
+			UserStart:
+				cout << "--- User Login ---\n";
+				cout << "1. Register\n";
+				cout << "2. Login\n";
+				cout << "0. Exit\n";
+				cout << "Enter choice: ";
+				char choice = _getch();
+				_putch(choice);
+				cout << endl;
+				if (int(choice) >= 48 && int(choice) <= 57) {
+
+					string username, password;
+					switch (int(choice)) {
+					case 48: {
+						break;
+					}
+					case 49: {
+
+						cout << "Enter new username: ";
+						cin >> username;
+
+						cout << "Enter password: ";
+						cin >> password;
+
+
+						try {
+							resUsers.Register(username, password);
+							Sleep(450);
+						}
+						catch (exception ex) {
+							cout << ex.what();
+							Sleep(350);
+							ResetColor();
+							goto UserStart;
+						}
+
+					}
+					case 50: {
+						system("cls");
+						cout << "Enter username to log in: ";
+						cin >> username;
+
+						cout << "Enter password: ";
+						cin >> password;
+
+						try {
+							resUsers.Login(username, password);
+							ShowUserPanel(depo, menu, cart);
+						}
+						catch (exception ex) {
+							SetColor(31);
+							cout << ex.what();
+							ResetColor();
+						}
+					}
+					default:
+						SetColor(31);
+						cout << "Invalid choice!\n";
+						ResetColor();
+						Sleep(450);
+						system("cls");
+
+					}
+				}
+				else {
+					system("cls");
+				}
 			}
 		}
 		}
